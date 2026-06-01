@@ -1,0 +1,1 @@
+export default function Page() { return <div className='p-8 text-white'><h1 className='text-2xl font-bold capitalize'>patches</h1><p className='text-gray-400 mt-2'>Phase 3 — UI coming from v0.dev</p></div> }
