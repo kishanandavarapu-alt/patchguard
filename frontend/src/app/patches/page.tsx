@@ -85,7 +85,6 @@ export default function PatchesPage() {
           <p style={{ color:"#8B949E", marginTop:4, fontSize:14 }}>Available and applied security patches</p>
         </div>
 
-        {/* Stats */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:28 }}>
           <div style={{ background:"#161B22", border:"1px solid #30363D", borderRadius:10, padding:20, display:"flex", alignItems:"center", gap:16 }}>
             <div style={{ width:44, height:44, borderRadius:"50%", background:"rgba(33,150,243,0.15)", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -116,7 +115,6 @@ export default function PatchesPage() {
           </div>
         </div>
 
-        {/* Patches Table */}
         <div style={{ background:"#161B22", border:"1px solid #30363D", borderRadius:10, overflow:"hidden" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
