@@ -1,3 +1,4 @@
+// PatchGuard v1.0
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
