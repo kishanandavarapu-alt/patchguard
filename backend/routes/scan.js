@@ -3,17 +3,10 @@ const router = express.Router();
 const supabase = require("../lib/supabase");
 
 const NVD_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0";
-const NVD_DELAY_MS = 600; // NVD asks for ~600ms between requests without a key
+const NVD_DELAY_MS = 600;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Sleep helper to respect NVD rate limits */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * Query NVD for CVEs matching a software keyword.
- * Returns an array of simplified CVE objects.
- */
 async function fetchCVEsFromNVD(keyword) {
   const params = new URLSearchParams({ keywordSearch: keyword });
   const headers = { Accept: "application/json" };
@@ -35,7 +28,6 @@ async function fetchCVEsFromNVD(keyword) {
   console.log(`[scan/nvd] ↩  Found ${total} CVE(s) for "${keyword}"`);
 
   return (data.vulnerabilities || []).map(({ cve }) => {
-    // Extract base severity from CVSS v3 first, fall back to v2
     const metrics = cve.metrics || {};
     const cvssV3 =
       metrics.cvssMetricV31?.[0]?.cvssData ||
@@ -51,7 +43,7 @@ async function fetchCVEsFromNVD(keyword) {
 
     return {
       cve_id: cve.id,
-      description: description.slice(0, 1000), // cap for DB storage
+      description: description.slice(0, 1000),
       severity: severity.toUpperCase(),
       cvss_score: score,
       published: cve.published,
@@ -69,38 +61,30 @@ router.post("/", async (req, res, next) => {
     return res.status(400).json({ error: "endpoint_id is required" });
   }
 
-  console.log(
-    `\n[scan] 🚦 Starting scan for endpoint_id="${endpoint_id}" (${req.requestId})`
-  );
+  console.log(`\n[scan] 🚦 Starting scan for endpoint_id="${endpoint_id}"`);
 
   try {
     // 1. Verify endpoint exists
     const { data: endpoint, error: epErr } = await supabase
       .from("endpoints")
-      .select("id, name, ip_address")
+      .select("id, hostname, ip_address")
       .eq("id", endpoint_id)
       .single();
 
     if (epErr || !endpoint) {
       console.warn(`[scan] ⚠️  Endpoint ${endpoint_id} not found`);
-      return res
-        .status(404)
-        .json({ error: "Endpoint not found", endpoint_id });
+      return res.status(404).json({ error: "Endpoint not found", endpoint_id });
     }
-    console.log(
-      `[scan] ✅ Endpoint found: ${endpoint.name} (${endpoint.ip_address})`
-    );
+    console.log(`[scan] ✅ Endpoint found: ${endpoint.hostname} (${endpoint.ip_address})`);
 
     // 2. Fetch installed software for this endpoint
     const { data: software, error: swErr } = await supabase
       .from("software")
-      .select("id, name, version, vendor")
+      .select("id, name, installed_version")
       .eq("endpoint_id", endpoint_id);
 
     if (swErr) throw swErr;
-    console.log(
-      `[scan] 📦 Found ${software.length} software package(s) to check`
-    );
+    console.log(`[scan] 📦 Found ${software.length} software package(s) to check`);
 
     if (software.length === 0) {
       return res.json({
@@ -116,10 +100,8 @@ router.post("/", async (req, res, next) => {
     let totalCVEs = 0;
 
     for (const pkg of software) {
-      const keyword = `${pkg.name} ${pkg.version}`.trim();
-      console.log(
-        `[scan] 🔎 Checking: ${pkg.name} v${pkg.version} (software_id=${pkg.id})`
-      );
+      const keyword = `${pkg.name} ${pkg.installed_version}`.trim();
+      console.log(`[scan] 🔎 Checking: ${pkg.name} v${pkg.installed_version}`);
 
       let cves = [];
       try {
@@ -134,32 +116,22 @@ router.post("/", async (req, res, next) => {
       // 4. Upsert each CVE into vulnerabilities table
       for (const cve of cves) {
         const record = {
-          endpoint_id,
           software_id: pkg.id,
           cve_id: cve.cve_id,
           description: cve.description,
-          severity: cve.severity,
+          severity: cve.severity.toLowerCase(),
           cvss_score: cve.cvss_score,
-          published: cve.published,
-          last_modified: cve.last_modified,
-          nvd_url: cve.nvd_url,
-          status: "open",
-          detected_at: new Date().toISOString(),
+          patch_available: true,
         };
 
         const { error: upsertErr } = await supabase
           .from("vulnerabilities")
-          .upsert(record, { onConflict: "endpoint_id,software_id,cve_id" });
+          .upsert(record, { onConflict: "cve_id" });
 
         if (upsertErr) {
-          console.error(
-            `[scan] ❌ Failed to save ${cve.cve_id}:`,
-            upsertErr.message
-          );
+          console.error(`[scan] ❌ Failed to save ${cve.cve_id}:`, upsertErr.message);
         } else {
-          console.log(
-            `[scan] 💾 Saved ${cve.cve_id} (${cve.severity}, CVSS ${cve.cvss_score})`
-          );
+          console.log(`[scan] 💾 Saved ${cve.cve_id} (${cve.severity}, CVSS ${cve.cvss_score})`);
           totalCVEs++;
         }
       }
@@ -171,7 +143,6 @@ router.post("/", async (req, res, next) => {
         cve_ids: cves.map((c) => c.cve_id),
       });
 
-      // Respect NVD rate limit between packages
       await sleep(NVD_DELAY_MS);
     }
 
@@ -181,14 +152,12 @@ router.post("/", async (req, res, next) => {
       .update({ last_scanned: new Date().toISOString() })
       .eq("id", endpoint_id);
 
-    console.log(
-      `[scan] ✅ Scan complete — ${totalCVEs} CVE(s) saved for endpoint ${endpoint_id}\n`
-    );
+    console.log(`[scan] ✅ Scan complete — ${totalCVEs} CVE(s) saved\n`);
 
     return res.json({
       message: "Scan complete",
       endpoint_id,
-      endpoint_name: endpoint.name,
+      endpoint_name: endpoint.hostname,
       packages_scanned: software.length,
       cves_found: totalCVEs,
       results: scanResults,
