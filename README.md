@@ -58,12 +58,3 @@ npm run dev               # Runs on :3000
 | GET    | /api/logs | Patch audit logs |
 | GET    | /api/alerts | Admin alerts |
 | POST   | /api/alerts | Create + email alert |
-
-## Phase Progress
-- [x] Phase 1 — Project Setup & Structure
-- [ ] Phase 2 — Database (Supabase)
-- [ ] Phase 3 — UI (v0.dev)
-- [ ] Phase 4 — Backend Logic
-- [ ] Phase 5 — Connect Frontend + Backend
-- [ ] Phase 6 — Auth
-- [ ] Phase 7 — Deploy
