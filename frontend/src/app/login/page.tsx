@@ -29,6 +29,10 @@ export default function LoginPage() {
     }
   }
 
+  const handleGuestLogin = () => {
+    router.push('/dashboard')
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -90,6 +94,25 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-gray-800" />
+            <span className="text-gray-600 text-xs">or</span>
+            <div className="flex-1 h-px bg-gray-800" />
+          </div>
+
+          {/* Guest Login */}
+          <button
+            onClick={handleGuestLogin}
+            className="w-full py-3 px-4 bg-transparent hover:bg-gray-800 border border-gray-700 hover:border-gray-500 text-gray-300 font-semibold rounded-lg transition duration-200"
+          >
+            🚀 Continue as Guest
+          </button>
+
+          <p className="text-center text-gray-600 text-xs mt-4">
+            Guest access allows read-only viewing of the dashboard
+          </p>
         </div>
 
         <p className="text-center text-gray-600 text-sm mt-6">
